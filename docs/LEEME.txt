@@ -1,0 +1,61 @@
+╔════════════════════════════════════════════════════════════════╗
+║  ETL RECETAS DESPACHADAS - HOMOLOGACIÓN IGLOBAL              ║
+║  Versión 1.2.1 - BIG DATA Optimizado                        ║
+╚════════════════════════════════════════════════════════════════╝
+
+INICIO RÁPIDO
+═══════════════════════════════════════════════════════════════
+
+1. Colocar archivos XLSX en: datos_entrada/
+
+2. Ejecutar desde RStudio:
+   source("run_pipeline.R")
+
+3. Resultado en: datos_salida/recetas_consolidadas.parquet
+
+
+REQUISITOS
+═══════════════════════════════════════════════════════════════
+
+install.packages(c("readxl", "dplyr", "tidyr", "stringr", "arrow", "readr"))
+
+
+DOCUMENTACIÓN
+═══════════════════════════════════════════════════════════════
+
+Ver PROYECTO.md para detalles completos
+
+
+ESTRUCTURA
+═══════════════════════════════════════════════════════════════
+
+etl_bigdata.R              - Ejecutable principal
+run_pipeline.R             - Wrapper de ejecución
+PROYECTO.md                - Documentación completa
+mapeo_datos_crudos.txt     - Esquema 69 columnas
+datos_entrada/             - Archivos XLSX aquí
+datos_salida/              - Parquet consolidado aquí
+diccionario_homologacion/  - Diccionario iGLOBAL
+
+
+SALIDA
+═══════════════════════════════════════════════════════════════
+
+Archivo: recetas_consolidadas.parquet
+Formato: Parquet con row groups de 50,000 filas
+Compresión: Snappy
+Compatible con: Power BI, RStudio, Python, Spark
+
+Lectura en RStudio:
+  library(arrow)
+  df <- read_parquet("datos_salida/recetas_consolidadas.parquet")
+
+Lectura en Power BI:
+  Obtener datos → Parquet → Seleccionar archivo
+
+
+CONTACTO
+═══════════════════════════════════════════════════════════════
+
+ETL Team
+2026-01-15

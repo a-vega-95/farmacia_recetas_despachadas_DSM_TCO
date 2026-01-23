@@ -1,0 +1,2 @@
+# Carpeta de salida para el archivo Parquet consolidado
+# El ETL genera: recetas_despachadas_consolidado.parquet

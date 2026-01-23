@@ -1,0 +1,32 @@
+# =============================================================================
+# GITIGNORE - ETL RECETAS DESPACHADAS
+# =============================================================================
+
+# --- DATOS DE ENTRADA ---
+# Ignorar todo el contenido de datos_entrada/ pero mantener la carpeta
+datos_entrada/*
+!datos_entrada/.gitkeep
+
+# --- DATOS DE SALIDA ---
+# Ignorar todo el contenido de datos_salida/ pero mantener la carpeta
+datos_salida/*
+!datos_salida/.gitkeep
+
+# --- LOGS ---
+# Ignorar todos los logs pero mantener la carpeta
+logs/*
+!logs/.gitkeep
+
+# --- ACTUALIZACIONES (si existe) ---
+ACTUALIZACIONES/
+
+# --- ARCHIVOS TEMPORALES DE R ---
+.Rhistory
+.RData
+.Rproj.user/
+
+# --- ARCHIVOS DE SISTEMA ---
+.DS_Store
+Thumbs.db
+*.tmp
+*~
