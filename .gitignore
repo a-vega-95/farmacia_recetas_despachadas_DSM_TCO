@@ -30,3 +30,6 @@ ACTUALIZACIONES/
 Thumbs.db
 *.tmp
 *~
+
+# --- mapeos de datos CRUDOS y PROCESADOS ---
+mapeo/

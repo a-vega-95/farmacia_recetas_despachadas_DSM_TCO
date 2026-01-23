@@ -1,6 +1,6 @@
 # ETL RECETAS DESPACHADAS - HOMOLOGACION IGLOBAL
 
-Versión 1.2.1
+Versión 1.2.2
 
 ---
 
@@ -31,7 +31,10 @@ Departamento de Salud Municipal de Temuco
 ### Transformaciones de Datos
 - Normalización automática de fechas (formatos múltiples)
 - Conversión de horas desde formato decimal Excel a HH:MM:SS
-- Creación de columnas derivadas (extension_17 para despachos >= 17:00hrs)
+- Creación de columnas derivadas:
+  - **extension_17**: Identifica despachos >= 17:00hrs
+  - **grupo_horas**: Agrupa despachos por bloques horarios (08:00-08:59, 09:00-09:59, etc.)
+  - **iso_dow**: Día de la semana ISO 8601 (1=Lunes, 7=Domingo)
 - Limpieza y estandarización de nombres de columnas
 - Optimización de tipos de datos
 
@@ -258,6 +261,18 @@ Conversión: Formato decimal Excel (0-1) a HH:MM:SS
 - `extension_17`: Indica si el despacho fue >= 17:00 hrs (SI/NO)
 - Calcula y reporta estadísticas de despachos en horario extendido
 
+**Columna grupo_horas:**
+- `grupo_horas`: Agrupa HORA DESPACHO en bloques horarios
+- Formato: "08:00-08:59", "09:00-09:59", "10:00-10:59", etc.
+- Facilita análisis de distribución horaria de despachos
+- Reporta número de grupos horarios identificados
+
+**Columna iso_dow:**
+- `iso_dow`: Día de la semana según ISO 8601
+- Valores: 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado, 7=Domingo
+- Generada desde FECHA DESPACHO
+- Reporta distribución de despachos por día de semana con porcentajes
+
 ### PASO 6: Aplicación de Homologación iGLOBAL
 - Detecta automáticamente columna ARTICULO
 - Normaliza strings de artículos (trim, uppercase)
@@ -323,6 +338,13 @@ Reporta:
 - **Row Groups:** 10,000 registros por grupo
 - **Encoding:** Dictionary encoding para columnas repetitivas
 - **Estadísticas:** Min/Max/Null count por columna
+- **Columnas Totales:** 72 (69 originales + 3 derivadas)
+- **Columnas Derivadas:**
+  - `archivo_origen`: Nombre del archivo fuente
+  - `extension_17`: Indicador de despacho en horario extendido (SI/NO)
+  - `grupo_horas`: Bloque horario del despacho (formato HH:00-HH:59)
+  - `iso_dow`: Día de la semana (1-7, donde 1=Lunes)
+  - `codigo_iglobal`: Código de homologación iGLOBAL
 - **Compatibilidad:** Power BI, RStudio, Python pandas, Apache Spark, DuckDB
 
 ### Ventajas del Formato Parquet
@@ -340,7 +362,8 @@ df <- read_parquet("datos_salida/recetas_despachadas_consolidado.parquet")
 # Lectura selectiva de columnas
 df_subset <- read_parquet(
   "datos_salida/recetas_despachadas_consolidado.parquet",
-  col_select = c("FECHA DESPACHO", "ARTICULO", "CANTIDAD DESPACHADA")
+  col_select = c("FECHA DESPACHO", "ARTICULO", "CANTIDAD DESPACHADA", 
+                 "extension_17", "grupo_horas", "iso_dow", "codigo_iglobal")
 )
 
 # Lectura con filtros (predicates)
@@ -349,6 +372,28 @@ df_filtrado <- read_parquet(
   "datos_salida/recetas_despachadas_consolidado.parquet",
   as_data_frame = TRUE
 ) %>% filter(`FECHA DESPACHO` >= as.Date("2025-01-01"))
+
+# Análisis por día de semana
+df %>%
+  group_by(iso_dow) %>%
+  summarise(
+    total_despachos = n(),
+    dias_semana = case_when(
+      iso_dow == 1 ~ "Lunes",
+      iso_dow == 2 ~ "Martes",
+      iso_dow == 3 ~ "Miércoles",
+      iso_dow == 4 ~ "Jueves",
+      iso_dow == 5 ~ "Viernes",
+      iso_dow == 6 ~ "Sábado",
+      iso_dow == 7 ~ "Domingo"
+    )
+  )
+
+# Análisis por bloque horario
+df %>%
+  group_by(grupo_horas) %>%
+  summarise(total_despachos = n()) %>%
+  arrange(grupo_horas)
 ```
 
 ### Lectura en Power BI
@@ -368,7 +413,8 @@ df = pd.read_parquet("datos_salida/recetas_despachadas_consolidado.parquet")
 # Leer columnas específicas
 df_subset = pd.read_parquet(
     "datos_salida/recetas_despachadas_consolidado.parquet",
-    columns=["FECHA DESPACHO", "ARTICULO", "CANTIDAD DESPACHADA"]
+    columns=["FECHA DESPACHO", "ARTICULO", "CANTIDAD DESPACHADA", 
+             "extension_17", "grupo_horas", "iso_dow", "codigo_iglobal"]
 )
 
 # Leer con filtros
@@ -377,6 +423,15 @@ table = pq.read_table(
     filters=[("FECHA DESPACHO", ">=", "2025-01-01")]
 )
 df_filtrado = table.to_pandas()
+
+# Análisis por día de semana
+dias_mapping = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 
+                5: "Viernes", 6: "Sábado", 7: "Domingo"}
+df['dia_nombre'] = df['iso_dow'].map(dias_mapping)
+df.groupby('dia_nombre').size()
+
+# Análisis por bloque horario
+df.groupby('grupo_horas').size().sort_index()
 ```
 
 ---
@@ -585,7 +640,32 @@ df_filtrado = table.to_pandas()
 4. Próxima ejecución usará diccionario actualizado
 
 ### Agregar Nuevas Columnas Derivadas
-Editar [etl_bigdata.R](src/etl/etl_bigdata.R) en sección "PASO 5.5" después de la creación de `extension_17`
+Editar [etl_bigdata.R](src/etl/etl_bigdata.R) en sección "PASO 5.5" después de la creación de `iso_dow`
+
+Ejemplo de implementación actual:
+```r
+# Columna extension_17
+df_consolidado <- df_consolidado %>%
+  mutate(
+    hora_despacho_decimal = as.numeric(sub(":.*", "", `HORA DESPACHO`)),
+    extension_17 = if_else(hora_despacho_decimal >= 17, "SI", "NO", missing = "NO")
+  ) %>%
+  select(-hora_despacho_decimal)
+
+# Columna grupo_horas
+df_consolidado <- df_consolidado %>%
+  mutate(
+    hora_despacho_num = as.numeric(sub(":.*", "", `HORA DESPACHO`)),
+    grupo_horas = sprintf("%02d:00-%02d:59", hora_despacho_num, hora_despacho_num)
+  ) %>%
+  select(-hora_despacho_num)
+
+# Columna iso_dow
+df_consolidado <- df_consolidado %>%
+  mutate(
+    iso_dow = as.integer(strftime(`FECHA DESPACHO`, format = "%u"))
+  )
+```
 
 ### Modificar Configuración de Parquet
 Editar [etl_bigdata.R](src/etl/etl_bigdata.R) en sección "CONFIGURACIÓN":
@@ -646,6 +726,13 @@ Los archivos en `logs/` contienen información detallada para diagnóstico:
 ---
 
 ## HISTORIAL DE VERSIONES
+
+### v1.2.2 (2026-01-23)
+- Agregada columna derivada grupo_horas: Bloques horarios de despacho (HH:00-HH:59)
+- Agregada columna derivada iso_dow: Día de la semana ISO 8601 (1=Lunes, 7=Domingo)
+- Estadísticas de distribución por día de semana con porcentajes
+- Estadísticas de grupos horarios identificados
+- Documentación actualizada con ejemplos de análisis temporal
 
 ### v1.2.1 (2026-01-23)
 - Implementación de rutas robustas con here::here()

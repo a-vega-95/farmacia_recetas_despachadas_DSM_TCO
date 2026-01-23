@@ -295,6 +295,58 @@ if ("HORA DESPACHO" %in% names(df_consolidado)) {
   log_warn(logger, "Columna HORA DESPACHO no encontrada, no se creó extension_17")
 }
 
+# Crear columna grupo_horas basada en HORA DESPACHO
+if ("HORA DESPACHO" %in% names(df_consolidado)) {
+  df_consolidado <- df_consolidado %>%
+    mutate(
+      hora_despacho_num = as.numeric(sub(":.*", "", `HORA DESPACHO`)),
+      grupo_horas = sprintf("%02d:00-%02d:59", hora_despacho_num, hora_despacho_num)
+    ) %>%
+    select(-hora_despacho_num)
+  
+  # Estadísticas de grupos
+  grupos_unicos <- n_distinct(df_consolidado$grupo_horas, na.rm = TRUE)
+  cat(sprintf("   - Columna grupo_horas creada\n"))
+  cat(sprintf("   - Grupos horarios identificados: %d\n", grupos_unicos))
+  log_info(logger, sprintf("grupo_horas: %d grupos horarios creados", grupos_unicos))
+} else {
+  log_warn(logger, "Columna HORA DESPACHO no encontrada, no se creó grupo_horas")
+}
+
+# Crear columna iso_dow (día de la semana ISO: 1=Lunes, 7=Domingo)
+if ("FECHA DESPACHO" %in% names(df_consolidado)) {
+  df_consolidado <- df_consolidado %>%
+    mutate(
+      iso_dow = as.integer(strftime(`FECHA DESPACHO`, format = "%u"))
+    )
+  
+  # Estadísticas por día de semana
+  dias_semana <- c("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+  cat(sprintf("   - Columna iso_dow creada (1=Lunes, 7=Domingo)\n"))
+  
+  # Distribución por día
+  dist_dias <- df_consolidado %>%
+    filter(!is.na(iso_dow)) %>%
+    count(iso_dow) %>%
+    arrange(iso_dow)
+  
+  if (nrow(dist_dias) > 0) {
+    cat("   - Distribución por día de semana:\n")
+    for (i in seq_len(nrow(dist_dias))) {
+      dia_num <- dist_dias$iso_dow[i]
+      dia_nombre <- dias_semana[dia_num]
+      cantidad <- dist_dias$n[i]
+      pct <- (cantidad / nrow(df_consolidado)) * 100
+      cat(sprintf("     %d (%s): %s despachos (%.2f%%)\n", 
+                  dia_num, dia_nombre, format(cantidad, big.mark = ","), pct))
+    }
+  }
+  
+  log_info(logger, sprintf("iso_dow: Columna día de semana creada (1-7)"))
+} else {
+  log_warn(logger, "Columna FECHA DESPACHO no encontrada, no se creó iso_dow")
+}
+
 # =============================================================================
 # PASO 6: APLICAR HOMOLOGACIÓN IGLOBAL
 # =============================================================================
@@ -524,6 +576,7 @@ cat(sprintf("  - Datos paciente: 26 columnas\n"))
 cat(sprintf("  - Datos receta: 17 columnas\n"))
 cat(sprintf("  - Datos artículo: 12 columnas\n"))
 cat(sprintf("  - Datos despacho: 14 columnas\n"))
+cat(sprintf("  - Columnas derivadas: 5 (archivo_origen, extension_17, grupo_horas, iso_dow, codigo_iglobal)\n"))
 cat(sprintf("  - Homologación IGLOBAL: SI\n"))
 cat(sprintf("\nSalida: %s\n", output_path))
 cat(sprintf("Tamaño: %.2f MB\n", file_size))
